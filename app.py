@@ -138,8 +138,12 @@ def test_google_connection():
 
 def setup_directories():
     """Create necessary directories if they don't exist."""
-    Path(VECTOR_STORE_DIR).mkdir(exist_ok=True)
-    Path(DOCS_DIR).mkdir(exist_ok=True)
+    try:
+        Path(VECTOR_STORE_DIR).mkdir(exist_ok=True)
+        Path(DOCS_DIR).mkdir(exist_ok=True)
+        st.text(f"Created/verified directories: {VECTOR_STORE_DIR}, {DOCS_DIR}")
+    except Exception as e:
+        st.error(f"Error creating directories: {str(e)}")
 
 def get_embeddings():
     """Initialize and return the Gemini embeddings model."""
@@ -444,6 +448,14 @@ def create_qa_chain(vectorstore: Chroma):
     return chain
 
 def main():
+    # Debug information about environment and files
+    st.text(f"Current working directory: {os.getcwd()}")
+    st.text(f"Contents of current directory: {os.listdir('.')}")
+    if os.path.exists(DOCS_DIR):
+        st.text(f"Contents of {DOCS_DIR} directory: {os.listdir(DOCS_DIR)}")
+    else:
+        st.text(f"'{DOCS_DIR}' directory does not exist!")
+    
     # Custom title with styling
     st.markdown('<div class="title-container"><h1 class="title-text">Sign OrangePrint Q&A</h1></div>', unsafe_allow_html=True)
     
@@ -501,4 +513,5 @@ def main():
                     st.error("Sorry, something went wrong. Please try again later.")
 
 if __name__ == "__main__":
+    setup_directories()  # Call this first
     main() 
