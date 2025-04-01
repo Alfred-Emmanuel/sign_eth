@@ -325,17 +325,25 @@ def process_documents():
 
 def get_vectorstore() -> Optional[Chroma]:
     """Get or create the vector store."""
-    embeddings = get_embeddings()
-    
-    # Check if vector store exists
-    if os.path.exists(os.path.join(VECTOR_STORE_DIR, "chroma.sqlite3")):
-        return Chroma(
-            persist_directory=VECTOR_STORE_DIR,
-            embedding_function=embeddings
-        )
-    
-    # Process documents if no store exists
-    return process_documents()
+    try:
+        embeddings = get_embeddings()
+        
+        # Check if vector store exists
+        if os.path.exists(os.path.join(VECTOR_STORE_DIR, "chroma.sqlite3")):
+            return Chroma(
+                persist_directory=VECTOR_STORE_DIR,
+                embedding_function=embeddings,
+                collection_metadata={"hnsw:space": "cosine"}
+            )
+        
+        # Process documents if no store exists
+        return process_documents()
+    except Exception as e:
+        if IS_DEV:
+            st.error(f"Error initializing vector store: {str(e)}")
+        else:
+            st.error("Unable to initialize the knowledge base. Please try again later.")
+        return None
 
 def create_qa_chain(vectorstore: Chroma):
     """Create the RAG QA chain."""
