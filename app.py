@@ -141,9 +141,11 @@ def setup_directories():
     try:
         Path(VECTOR_STORE_DIR).mkdir(exist_ok=True)
         Path(DOCS_DIR).mkdir(exist_ok=True)
-        st.text(f"Created/verified directories: {VECTOR_STORE_DIR}, {DOCS_DIR}")
+        if IS_DEV:
+            st.text(f"Created/verified directories: {VECTOR_STORE_DIR}, {DOCS_DIR}")
     except Exception as e:
-        st.error(f"Error creating directories: {str(e)}")
+        if IS_DEV:
+            st.error(f"Error creating directories: {str(e)}")
 
 def get_embeddings():
     """Initialize and return the Gemini embeddings model."""
@@ -332,38 +334,48 @@ def load_documents():
         file_path = os.path.join(DOCS_DIR, "sign_docs.txt")
         abs_path = os.path.abspath(file_path)
         
-        # Detailed logging
-        st.text("=== Document Loading Debug Info ===")
-        st.text(f"Attempting to load file: {abs_path}")
-        st.text(f"File exists check: {os.path.exists(file_path)}")
+        # Detailed logging only in dev mode
+        if IS_DEV:
+            st.text("=== Document Loading Debug Info ===")
+            st.text(f"Attempting to load file: {abs_path}")
+            st.text(f"File exists check: {os.path.exists(file_path)}")
         
         if not os.path.exists(file_path):
-            st.error(f"File not found: {file_path}")
+            if IS_DEV:
+                st.error(f"File not found: {file_path}")
             return None
             
         try:
-            st.text("Attempting to read file contents...")
+            if IS_DEV:
+                st.text("Attempting to read file contents...")
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
-            st.text(f"Successfully read file. Content length: {len(content)} characters")
+            if IS_DEV:
+                st.text(f"Successfully read file. Content length: {len(content)} characters")
             
             if len(content.strip()) == 0:
-                st.error("File is empty!")
+                if IS_DEV:
+                    st.error("File is empty!")
                 return None
                 
         except Exception as read_error:
-            st.error(f"Error reading file: {str(read_error)}")
-            st.text(f"Error type: {type(read_error)}")
+            if IS_DEV:
+                st.error(f"Error reading file: {str(read_error)}")
+                st.text(f"Error type: {type(read_error)}")
             return None
             
-        st.text("Creating document object...")
+        if IS_DEV:
+            st.text("Creating document object...")
+        
         # Create document with metadata
         document = Document(
             page_content=content,
             metadata={"source": file_path}
         )
         
-        st.text("Initializing text splitter...")
+        if IS_DEV:
+            st.text("Initializing text splitter...")
+        
         # Split the document
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=CHUNK_SIZE,
@@ -371,60 +383,71 @@ def load_documents():
             length_function=len
         )
         
-        st.text("Splitting document...")
+        if IS_DEV:
+            st.text("Splitting document...")
         splits = text_splitter.split_documents([document])
-        st.text(f"Document split into {len(splits)} chunks")
+        if IS_DEV:
+            st.text(f"Document split into {len(splits)} chunks")
         
-        if not splits:
-            st.error("Document splitting produced no chunks!")
-            return None
-            
         return splits
         
     except Exception as e:
-        st.error("=== Document Loading Error ===")
-        st.error(f"Error type: {type(e)}")
-        st.error(f"Error message: {str(e)}")
-        import traceback
-        st.text("Full traceback:")
-        st.text(traceback.format_exc())
+        if IS_DEV:
+            st.error("=== Document Loading Error ===")
+            st.error(f"Error type: {type(e)}")
+            st.error(f"Error message: {str(e)}")
+            import traceback
+            st.text(traceback.format_exc())
         return None
 
 def get_vectorstore() -> Optional[FAISS]:
     """Get or create the vector store."""
     try:
-        st.text("=== Vector Store Initialization ===")
-        st.text("Initializing embeddings...")
+        if IS_DEV:
+            st.text("=== Vector Store Initialization ===")
+            st.text("Initializing embeddings...")
         embeddings = get_embeddings()
         
-        st.text("Loading documents...")
+        if IS_DEV:
+            st.text("Loading documents...")
         documents = load_documents()
         if not documents:
-            st.error("Document loading failed - no documents returned")
+            if IS_DEV:
+                st.error("Document loading failed - no documents returned")
+            else:
+                st.error("Unable to initialize the knowledge base. Please try again later.")
             return None
         
-        st.text(f"Creating vector store with {len(documents)} documents...")
+        if IS_DEV:
+            st.text(f"Creating vector store with {len(documents)} documents...")
         try:
             vectorstore = FAISS.from_documents(
                 documents=documents,
                 embedding=embeddings
             )
-            st.text("Vector store created successfully")
+            if IS_DEV:
+                st.text("Vector store created successfully")
             return vectorstore
         except Exception as ve:
-            st.error("=== Vector Store Creation Error ===")
-            st.error(f"Error type: {type(ve)}")
-            st.error(f"Error message: {str(ve)}")
-            import traceback
-            st.text(traceback.format_exc())
+            if IS_DEV:
+                st.error("=== Vector Store Creation Error ===")
+                st.error(f"Error type: {type(ve)}")
+                st.error(f"Error message: {str(ve)}")
+                import traceback
+                st.text(traceback.format_exc())
+            else:
+                st.error("Unable to initialize the knowledge base. Please try again later.")
             return None
             
     except Exception as e:
-        st.error("=== General Vector Store Error ===")
-        st.error(f"Error type: {type(e)}")
-        st.error(f"Error message: {str(e)}")
-        import traceback
-        st.text(traceback.format_exc())
+        if IS_DEV:
+            st.error("=== General Vector Store Error ===")
+            st.error(f"Error type: {type(e)}")
+            st.error(f"Error message: {str(e)}")
+            import traceback
+            st.text(traceback.format_exc())
+        else:
+            st.error("Unable to initialize the knowledge base. Please try again later.")
         return None
 
 def create_qa_chain(vectorstore: FAISS):
@@ -459,13 +482,14 @@ def create_qa_chain(vectorstore: FAISS):
     return chain
 
 def main():
-    # Debug information about environment and files
-    st.text(f"Current working directory: {os.getcwd()}")
-    st.text(f"Contents of current directory: {os.listdir('.')}")
-    if os.path.exists(DOCS_DIR):
-        st.text(f"Contents of {DOCS_DIR} directory: {os.listdir(DOCS_DIR)}")
-    else:
-        st.text(f"'{DOCS_DIR}' directory does not exist!")
+    # Debug information about environment and files - only in dev mode
+    if IS_DEV:
+        st.text(f"Current working directory: {os.getcwd()}")
+        st.text(f"Contents of current directory: {os.listdir('.')}")
+        if os.path.exists(DOCS_DIR):
+            st.text(f"Contents of {DOCS_DIR} directory: {os.listdir(DOCS_DIR)}")
+        else:
+            st.text(f"'{DOCS_DIR}' directory does not exist!")
     
     # Custom title with styling
     st.markdown('<div class="title-container"><h1 class="title-text">Sign OrangePrint Q&A</h1></div>', unsafe_allow_html=True)
