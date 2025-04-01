@@ -10,7 +10,7 @@ import streamlit as st
 from dotenv import load_dotenv
 from langchain_community.document_loaders import DirectoryLoader
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_community.vectorstores import Chroma
+from langchain_community.vectorstores import FAISS
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.chains import RetrievalQA
@@ -177,10 +177,9 @@ def generate_embeddings_with_retry(embeddings, batch):
     try:
         if isinstance(batch, list) and len(batch) == 0:
             return None
-        return Chroma.from_documents(
+        return FAISS.from_documents(
             documents=batch,
-            embedding=embeddings,
-            persist_directory=VECTOR_STORE_DIR
+            embedding=embeddings
         )
     except Exception as e:
         st.text(f"Retrying due to error: {str(e)}")
@@ -391,7 +390,7 @@ def load_documents():
         st.text(traceback.format_exc())
         return None
 
-def get_vectorstore() -> Optional[Chroma]:
+def get_vectorstore() -> Optional[FAISS]:
     """Get or create the vector store."""
     try:
         st.text("=== Vector Store Initialization ===")
@@ -406,10 +405,9 @@ def get_vectorstore() -> Optional[Chroma]:
         
         st.text(f"Creating vector store with {len(documents)} documents...")
         try:
-            vectorstore = Chroma.from_documents(
+            vectorstore = FAISS.from_documents(
                 documents=documents,
-                embedding=embeddings,
-                collection_metadata={"hnsw:space": "cosine"}
+                embedding=embeddings
             )
             st.text("Vector store created successfully")
             return vectorstore
@@ -429,7 +427,7 @@ def get_vectorstore() -> Optional[Chroma]:
         st.text(traceback.format_exc())
         return None
 
-def create_qa_chain(vectorstore: Chroma):
+def create_qa_chain(vectorstore: FAISS):
     """Create the RAG QA chain."""
     llm = get_llm()
     
