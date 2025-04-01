@@ -323,44 +323,33 @@ def process_documents():
             st.text(traceback.format_exc())
         return None
 
-def get_vectorstore() -> Optional[Chroma]:
-    """Get or create the vector store."""
-    try:
-        embeddings = get_embeddings()
-        
-        # Create an in-memory vector store
-        documents = load_documents()
-        if not documents:
-            if IS_DEV:
-                st.error("No documents loaded")
-            else:
-                st.error("Unable to initialize the knowledge base. Please try again later.")
-            return None
-            
-        return Chroma.from_documents(
-            documents=documents,
-            embedding=embeddings,
-            collection_metadata={"hnsw:space": "cosine"}
-        )
-    except Exception as e:
-        if IS_DEV:
-            st.error(f"Error initializing vector store: {str(e)}")
-        else:
-            st.error("Unable to initialize the knowledge base. Please try again later.")
-        return None
-
 def load_documents():
     """Load documents from the docs directory."""
     try:
         file_path = os.path.join(DOCS_DIR, "sign_docs.txt")
+        
+        # Log the absolute path and existence check
+        abs_path = os.path.abspath(file_path)
+        if IS_DEV:
+            st.text(f"Looking for file at: {abs_path}")
+            st.text(f"File exists: {os.path.exists(file_path)}")
+            st.text(f"Current working directory: {os.getcwd()}")
+            st.text(f"Directory contents: {os.listdir(DOCS_DIR)}")
         
         if not os.path.exists(file_path):
             if IS_DEV:
                 st.error(f"File not found: {file_path}")
             return None
             
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                if IS_DEV:
+                    st.text(f"Successfully read {len(content)} characters from file")
+        except Exception as read_error:
+            if IS_DEV:
+                st.error(f"Error reading file: {str(read_error)}")
+            return None
             
         # Create document with metadata
         document = Document(
@@ -375,11 +364,52 @@ def load_documents():
             length_function=len
         )
         
-        return text_splitter.split_documents([document])
+        splits = text_splitter.split_documents([document])
+        if IS_DEV:
+            st.text(f"Created {len(splits)} document chunks")
+        
+        return splits
         
     except Exception as e:
         if IS_DEV:
             st.error(f"Error loading documents: {str(e)}")
+            import traceback
+            st.text(traceback.format_exc())
+        return None
+
+def get_vectorstore() -> Optional[Chroma]:
+    """Get or create the vector store."""
+    try:
+        if IS_DEV:
+            st.text("Initializing embeddings...")
+        embeddings = get_embeddings()
+        
+        if IS_DEV:
+            st.text("Loading documents...")
+        # Create an in-memory vector store
+        documents = load_documents()
+        if not documents:
+            if IS_DEV:
+                st.error("No documents loaded")
+            else:
+                st.error("Unable to initialize the knowledge base. Please try again later.")
+            return None
+        
+        if IS_DEV:
+            st.text(f"Creating vector store with {len(documents)} documents...")
+            
+        return Chroma.from_documents(
+            documents=documents,
+            embedding=embeddings,
+            collection_metadata={"hnsw:space": "cosine"}
+        )
+    except Exception as e:
+        if IS_DEV:
+            st.error(f"Error initializing vector store: {str(e)}")
+            import traceback
+            st.text(traceback.format_exc())
+        else:
+            st.error("Unable to initialize the knowledge base. Please try again later.")
         return None
 
 def create_qa_chain(vectorstore: Chroma):
