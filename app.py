@@ -328,21 +328,58 @@ def get_vectorstore() -> Optional[Chroma]:
     try:
         embeddings = get_embeddings()
         
-        # Check if vector store exists
-        if os.path.exists(os.path.join(VECTOR_STORE_DIR, "chroma.sqlite3")):
-            return Chroma(
-                persist_directory=VECTOR_STORE_DIR,
-                embedding_function=embeddings,
-                collection_metadata={"hnsw:space": "cosine"}
-            )
-        
-        # Process documents if no store exists
-        return process_documents()
+        # Create an in-memory vector store
+        documents = load_documents()
+        if not documents:
+            if IS_DEV:
+                st.error("No documents loaded")
+            else:
+                st.error("Unable to initialize the knowledge base. Please try again later.")
+            return None
+            
+        return Chroma.from_documents(
+            documents=documents,
+            embedding=embeddings,
+            collection_metadata={"hnsw:space": "cosine"}
+        )
     except Exception as e:
         if IS_DEV:
             st.error(f"Error initializing vector store: {str(e)}")
         else:
             st.error("Unable to initialize the knowledge base. Please try again later.")
+        return None
+
+def load_documents():
+    """Load documents from the docs directory."""
+    try:
+        file_path = os.path.join(DOCS_DIR, "sign_docs.txt")
+        
+        if not os.path.exists(file_path):
+            if IS_DEV:
+                st.error(f"File not found: {file_path}")
+            return None
+            
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+        # Create document with metadata
+        document = Document(
+            page_content=content,
+            metadata={"source": file_path}
+        )
+        
+        # Split the document
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=CHUNK_SIZE,
+            chunk_overlap=CHUNK_OVERLAP,
+            length_function=len
+        )
+        
+        return text_splitter.split_documents([document])
+        
+    except Exception as e:
+        if IS_DEV:
+            st.error(f"Error loading documents: {str(e)}")
         return None
 
 def create_qa_chain(vectorstore: Chroma):
@@ -396,26 +433,9 @@ def main():
     </div>
     """, unsafe_allow_html=True)
     
-    # Setup directories
-    setup_directories()
-    
-    # Add reload button only in development mode
-    if IS_DEV:
-        if st.button("Reload Documents"):
-            with st.spinner("Processing documents..."):
-                vectorstore = process_documents()
-                if vectorstore:
-                    st.success("Documents processed successfully!")
-                else:
-                    st.error("No documents found to process!")
-    
-    # Get or create vector store
+    # Get vector store
     vectorstore = get_vectorstore()
     if not vectorstore:
-        if IS_DEV:
-            st.error("No documents available. Please add some .txt files to the docs folder!")
-        else:
-            st.error("Sorry, the service is temporarily unavailable. Please try again later.")
         return
     
     # Create QA chain
@@ -429,7 +449,7 @@ def main():
         with st.spinner("Searching through the OrangePrint..."):
             try:
                 # Get answer
-                result = qa_chain.invoke({"query": question})  # Using invoke instead of call
+                result = qa_chain.invoke({"query": question})
                 
                 # Display answer with custom styling
                 st.markdown('<div class="answer-container">', unsafe_allow_html=True)
