@@ -455,15 +455,20 @@ def create_qa_chain(vectorstore: FAISS):
     llm = get_llm()
     
     # Create prompt template
-    prompt_template = """Use the following pieces of context to answer the question at the end. 
-    If you don't know the answer from the context, just say that you don't know, don't try to make up an answer.
+    prompt_template = """You are a helpful assistant for Sign's Orange Dynasty community. Use the following pieces of context to answer the question. 
+    If the exact answer isn't found in the context, try to:
+    1. Provide relevant information from the context that might be helpful
+    2. Suggest where the user might find more information (e.g., Sign's social media, community channels)
+    3. Explain what is known from the context that's related to their question
+
+    Remember to maintain a friendly, supportive tone aligned with Sign's community values.
 
     Context:
     {context}
 
     Question: {question}
 
-    Answer:"""
+    Answer: Let me help you with that. """
     
     PROMPT = PromptTemplate(
         template=prompt_template,
@@ -474,8 +479,11 @@ def create_qa_chain(vectorstore: FAISS):
     chain = RetrievalQA.from_chain_type(
         llm=llm,
         chain_type="stuff",
-        retriever=vectorstore.as_retriever(search_kwargs={"k": 4}),
-        chain_type_kwargs={"prompt": PROMPT},
+        retriever=vectorstore.as_retriever(search_kwargs={"k": 6}),  # Increased from 4 to 6 for more context
+        chain_type_kwargs={
+            "prompt": PROMPT,
+            "verbose": IS_DEV
+        },
         return_source_documents=True
     )
     
@@ -534,12 +542,13 @@ def main():
                 st.write(result["result"])
                 st.markdown('</div>', unsafe_allow_html=True)
                 
-                # Display sources with custom styling
-                with st.expander("📚 View Source Documents"):
-                    for doc in result["source_documents"]:
-                        st.markdown(f"**Source:** {doc.metadata['source']}")
-                        st.markdown(f"**Content:** {doc.page_content}")
-                        st.markdown("---")
+                # Display sources only in development mode
+                if IS_DEV:
+                    with st.expander("📚 View Source Documents"):
+                        for doc in result["source_documents"]:
+                            st.markdown(f"**Source:** {doc.metadata['source']}")
+                            st.markdown(f"**Content:** {doc.page_content}")
+                            st.markdown("---")
                 
             except Exception as e:
                 if IS_DEV:
