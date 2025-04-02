@@ -526,8 +526,7 @@ def main():
     # Create QA chain
     qa_chain = create_qa_chain(vectorstore)
     
-    # Create question input with custom styling
-    st.markdown('<div style="margin: 2rem 0;">', unsafe_allow_html=True)
+    # Create question input
     question = st.text_input("What would you like to know about Sign?")
     
     if st.button("Get Answer") and question:
